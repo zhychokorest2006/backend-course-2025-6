@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register Inventory Item</title>
+</head>
+<body>
+
+  <h1>Inventory Registration</h1>
+
+  <form action="/register" method="POST" enctype="multipart/form-data">
+
+    <label for="inventory_name">Назва пристрою:</label><br>
+    <input type="text" id="inventory_name" name="inventory_name" required>
+    <br><br>
+
+    <label for="description">Опис:</label><br>
+    <textarea id="description" name="description" rows="3"></textarea>
+    <br><br>
+
+    <label for="photo">Фото (необов’язково):</label><br>
+    <input type="file" id="photo" name="photo" accept="image/*">
+    <br><br>
+
+    <button type="submit">Зареєструвати</button>
+
+  </form>
+
+</body>
+</html>
