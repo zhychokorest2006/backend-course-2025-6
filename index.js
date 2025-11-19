@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Swagger (мінімальний)
+// ===== Swagger (мінімальний) =====
 const swaggerDoc = {
   openapi: "3.0.0",
   info: {
@@ -52,20 +52,17 @@ const swaggerDoc = {
   },
   paths: {
     "/inventory": {
-      get: {
-        summary: "Get all items",
-        responses: { 200: { description: "OK" } }
-      }
+      get: { summary: "Get all items", responses: { 200: { description: "OK" } } }
     },
     "/register": {
       post: {
-        summary: "Register new item",
+        summary: "Register item",
         responses: { 201: { description: "Created" }, 400: { description: "Bad request" } }
       }
     },
     "/search": {
       post: {
-        summary: "Search item by id",
+        summary: "Search item by ID",
         responses: { 200: { description: "Found" }, 404: { description: "Not found" } }
       }
     }
@@ -83,7 +80,7 @@ app.get("/SearchForm.html", (_, res) => {
   res.sendFile(path.join(__dirname, "SearchForm.html"));
 });
 
-// Реєстрація речі
+// ===== POST /register =====
 app.post("/register", upload.single("photo"), (req, res) => {
   if (!req.body.inventory_name) {
     return res.status(400).json({ error: "inventory_name required" });
@@ -100,19 +97,35 @@ app.post("/register", upload.single("photo"), (req, res) => {
   res.status(201).json(item);
 });
 
-// Список всіх
+// ===== GET /inventory =====
 app.get("/inventory", (_, res) => {
   res.json(db);
 });
 
-// Одна річ за id
+// ===== GET /inventory/:id =====
 app.get("/inventory/:id", (req, res) => {
   const item = db.find(x => x.id == req.params.id);
   if (!item) return res.status(404).json({ error: "not found" });
   res.json(item);
 });
 
-// Оновити name/description
+// ===== GET /inventory/:id/photo =====
+app.get("/inventory/:id/photo", (req, res) => {
+  const item = db.find(x => x.id == req.params.id);
+  if (!item || !item.photo) {
+    return res.status(404).json({ error: "no photo" });
+  }
+
+  const filePath = path.join(CACHE, item.photo);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "file missing" });
+  }
+
+  res.sendFile(filePath);
+});
+
+// ===== PUT /inventory/:id =====
 app.put("/inventory/:id", (req, res) => {
   const item = db.find(x => x.id == req.params.id);
   if (!item) return res.status(404).json({ error: "not found" });
@@ -123,62 +136,65 @@ app.put("/inventory/:id", (req, res) => {
   res.json(item);
 });
 
-// Повернути фото
-app.get("/inventory/:id/photo", (req, res) => {
-  const item = db.find(x => x.id == req.params.id);
-  if (!item || !item.photo) {
-    return res.status(404).json({ error: "no photo" });
-  }
-
-  const filePath = path.join(CACHE, item.photo);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "file missing" });
-  }
-
-  res.sendFile(filePath);
-});
-
-// Оновити фото
+// ===== PUT /inventory/:id/photo =====
 app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
   const item = db.find(x => x.id == req.params.id);
   if (!item) return res.status(404).json({ error: "not found" });
   if (!req.file) return res.status(400).json({ error: "no file" });
 
+  // видалити старе фото
+  if (item.photo) {
+    const oldPath = path.join(CACHE, item.photo);
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+
   item.photo = req.file.filename;
   res.json({ ok: true });
 });
 
-// Видалення
+// ===== DELETE /inventory/:id =====
 app.delete("/inventory/:id", (req, res) => {
-  const idx = db.findIndex(x => x.id == req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "not found" });
+  const index = db.findIndex(x => x.id == req.params.id);
 
-  db.splice(idx, 1);
-  res.json({ ok: true });
+  if (index === -1) return res.status(404).json({ error: "not found" });
+
+  const item = db[index];
+
+  // Видалити фото з папки
+  if (item.photo) {
+    const filePath = path.join(CACHE, item.photo);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+
+  db.splice(index, 1);
+
+  res.json({ ok: true, message: "Item and photo removed" });
 });
 
-// Пошук з можливим додаванням посилання на фото
+// ===== POST /search =====
 app.post("/search", (req, res) => {
   const item = db.find(x => x.id == req.body.id);
   if (!item) return res.status(404).json({ error: "not found" });
 
-  let text = item.description;
+  let desc = item.description;
+
   if (req.body.has_photo && item.photo) {
-    text += "\nФото: /inventory/" + item.id + "/photo";
+    desc += "\nФото: /inventory/" + item.id + "/photo";
   }
 
   res.json({
     id: item.id,
     name: item.name,
-    description: text
+    description: desc
   });
 });
 
-// 405 для всього іншого (фікс замість app.all("*"))
+// ===== 405 CATCH-ALL =====
 app.use((req, res) => {
   res.status(405).send("Method not allowed");
 });
 
+// ===== START SERVER =====
 http.createServer(app).listen(PORT, HOST, () => {
   console.log("Server running at http://" + HOST + ":" + PORT);
 });
